@@ -1,16 +1,17 @@
 package com.example.client.menu;
 
+import com.example.client.mixin.MinecraftMixin;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
-import sun.misc.Unsafe;
 
 public class AccountsScreen extends Screen {
     private final Screen parent;
@@ -47,34 +48,16 @@ public class AccountsScreen extends Screen {
 
         try {
             Minecraft mc = Minecraft.getInstance();
-            Object user = mc.getUser(); // Получаем текущий объект User
-
-            // Получаем доступ к Unsafe (чтобы обойти защиту Java 21 на изменение final полей)
-            Field theUnsafeField = Unsafe.class.getDeclaredField("theUnsafe");
-            theUnsafeField.setAccessible(true);
-            Unsafe unsafe = (Unsafe) theUnsafeField.get(null);
-
-            // Генерируем новый оффлайн UUID
             UUID newUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(StandardCharsets.UTF_8));
+            
+            // Создаем нового юзера
+            User newUser = new User(newName, newUuid, "0", Optional.empty(), Optional.empty());
+            
+            // Подменяем юзера через наш Mixin
+            ((MinecraftMixin) mc).setUser(newUser);
 
-            // Меняем поле name прямо внутри объекта User
-            Field nameField = user.getClass().getDeclaredField("name");
-            long nameOffset = unsafe.objectFieldOffset(nameField);
-            unsafe.putObject(user, nameOffset, newName);
-
-            // Меняем поле uuid прямо внутри объекта User
-            Field uuidField = user.getClass().getDeclaredField("uuid");
-            long uuidOffset = unsafe.objectFieldOffset(uuidField);
-            unsafe.putObject(user, uuidOffset, newUuid);
-
-            // Проверяем, применились ли изменения
-            if (mc.getUser().getName().equals(newName)) {
-                statusMessage = "УСПЕХ! Ник изменен на " + newName;
-                statusColor = 0x55FF55; // Зеленый
-            } else {
-                statusMessage = "Ошибка: Изменения не применились.";
-                statusColor = 0xFF5555;
-            }
+            statusMessage = "УСПЕХ! Ник изменен на " + newName;
+            statusColor = 0x55FF55; // Зеленый
 
         } catch (Throwable e) {
             String errorName = e.getClass().getSimpleName();
