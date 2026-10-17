@@ -32,7 +32,8 @@ public class CustomMainMenuScreen extends Screen {
     protected void init() {
         buttons.clear();
         int totalH = buttonsCount() * BTN_H + (buttonsCount() - 1) * GAP;
-        int startY = this.height / 2 - totalH / 2 + 10;
+        // Опускаем кнопки чуть ниже (было +10, стало +30)
+        int startY = this.height / 2 - totalH / 2 + 30;
         int x = this.width / 2 - BTN_W / 2;
         int y = startY;
 
@@ -57,23 +58,18 @@ public class CustomMainMenuScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
-        // Темный фон
         g.fill(0, 0, this.width, this.height, 0x99000000);
 
         String nick = this.minecraft.getUser().getName();
-        // ВОЗВРАЩАЕМ СТАРЫЙ ТЕКСТ
-        g.drawCenteredString(this.font, "Good to see you, " + nick, this.width / 2, this.height / 2 - 80, 0xFFFFFFFF);
-        g.drawCenteredString(this.font, "Hello Player! Good Game", this.width / 2, this.height / 2 - 65, 0xFFA678FF);
+        // Текст опустили прямо над кнопками (было -80 и -65, стало -70 и -55)
+        g.drawCenteredString(this.font, "Good to see you, " + nick, this.width / 2, this.height / 2 - 70, 0xFFFFFFFF);
+        g.drawCenteredString(this.font, "Hello Player! Good Game", this.width / 2, this.height / 2 - 55, 0xFFA678FF);
 
         for (MenuButton b : buttons) {
             boolean hovered = b.contains(mouseX, mouseY);
-            
-            // СВЕТЛЕЕ И ВИДИМЕЕ: Темно-серый (0x80151520) без наведения, чуть светлее с наведением (0xB0252535)
             int fill = hovered ? 0xB0252535 : 0x80151520; 
             
             rounded(g, b.x(), b.y(), BTN_W, BTN_H, 4, fill);
-            
-            // Обводка при наведении (белая, полупрозрачная)
             if (hovered) {
                 roundedOutline(g, b.x(), b.y(), BTN_W, BTN_H, 4, 0x88FFFFFF);
             }
