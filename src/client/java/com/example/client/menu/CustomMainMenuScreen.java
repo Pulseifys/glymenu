@@ -12,9 +12,9 @@ import java.util.List;
 
 public class CustomMainMenuScreen extends Screen {
 
-    private static final int BTN_W = 200; // Ширина кнопок
-    private static final int BTN_H = 20;  // Высота кнопок
-    private static final int GAP = 8;     // Отступ между кнопками
+    private static final int BTN_W = 200;
+    private static final int BTN_H = 20;
+    private static final int GAP = 8;
 
     private record MenuButton(String text, int x, int y, Runnable action) {
         boolean contains(double mx, double my) {
@@ -32,8 +32,7 @@ public class CustomMainMenuScreen extends Screen {
     protected void init() {
         buttons.clear();
         int totalH = buttonsCount() * BTN_H + (buttonsCount() - 1) * GAP;
-        // Немного подняли кнопки вверх, как на второй фотке
-        int startY = this.height / 2 - totalH / 2 + 10; 
+        int startY = this.height / 2 - totalH / 2 + 10;
         int x = this.width / 2 - BTN_W / 2;
         int y = startY;
 
@@ -58,25 +57,25 @@ public class CustomMainMenuScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
-        // Очень темный фон (если хочешь прозрачность до фона, измени 0x66000000 на 0x00000000)
-        g.fill(0, 0, this.width, this.height, 0x66000000); 
+        // Темный фон
+        g.fill(0, 0, this.width, this.height, 0x99000000);
 
         String nick = this.minecraft.getUser().getName();
-        // Текст как на 2 фотке
+        // ВОЗВРАЩАЕМ СТАРЫЙ ТЕКСТ
         g.drawCenteredString(this.font, "Good to see you, " + nick, this.width / 2, this.height / 2 - 80, 0xFFFFFFFF);
-        g.drawCenteredString(this.font, "Welcome, The Best Visuals Phantom Visuals <3", this.width / 2, this.height / 2 - 65, 0xFFA678FF);
+        g.drawCenteredString(this.font, "Hello Player! Good Game", this.width / 2, this.height / 2 - 65, 0xFFA678FF);
 
         for (MenuButton b : buttons) {
             boolean hovered = b.contains(mouseX, mouseY);
             
-            // Темно-серые/черные кнопки (A0000000 = 60% прозрачности, E0000000 = 90% при наведении)
-            int fill = hovered ? 0xE0000000 : 0xA0000000; 
+            // СВЕТЛЕЕ И ВИДИМЕЕ: Темно-серый (0x80151520) без наведения, чуть светлее с наведением (0xB0252535)
+            int fill = hovered ? 0xB0252535 : 0x80151520; 
             
             rounded(g, b.x(), b.y(), BTN_W, BTN_H, 4, fill);
             
-            // Тонкая обводка только когда мышка наведена
+            // Обводка при наведении (белая, полупрозрачная)
             if (hovered) {
-                roundedOutline(g, b.x(), b.y(), BTN_W, BTN_H, 4, 0x55FFFFFF);
+                roundedOutline(g, b.x(), b.y(), BTN_W, BTN_H, 4, 0x88FFFFFF);
             }
             
             int textY = b.y() + (BTN_H - this.font.lineHeight) / 2;
