@@ -7,10 +7,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 import java.util.UUID;
 import sun.misc.Unsafe;
 
@@ -49,49 +47,38 @@ public class AccountsScreen extends Screen {
 
         try {
             Minecraft mc = Minecraft.getInstance();
-            UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(StandardCharsets.UTF_8));
+            Object user = mc.getUser(); // Получаем текущий объект User
 
-            Class<?> userClass = Class.forName("net.minecraft.client.User");
-            Constructor<?> constructor = null;
-            for (Constructor<?> c : userClass.getConstructors()) {
-                if (c.getParameterCount() == 5) {
-                    constructor = c;
-                    break;
-                }
-            }
-
-            if (constructor == null) {
-                statusMessage = "Ошибка: Не найден конструктор User!";
-                statusColor = 0xFF5555;
-                return;
-            }
-
-            Object newUser = constructor.newInstance(newName, uuid, "0", Optional.empty(), Optional.empty());
-
-            // ХАК: Используем Unsafe, чтобы обойти защиту Java 21 на изменение final полей
+            // Получаем доступ к Unsafe (чтобы обойти защиту Java 21 на изменение final полей)
             Field theUnsafeField = Unsafe.class.getDeclaredField("theUnsafe");
             theUnsafeField.setAccessible(true);
             Unsafe unsafe = (Unsafe) theUnsafeField.get(null);
 
-            Field userField = Minecraft.class.getDeclaredField("user");
-            long offset = unsafe.objectFieldOffset(userField);
-            
-            // Подменяем пользователя напрямую в памяти
-            unsafe.putObject(mc, offset, newUser);
+            // Генерируем новый оффлайн UUID
+            UUID newUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(StandardCharsets.UTF_8));
 
-            // Проверяем, сменился ли ник в самом Minecraft
+            // Меняем поле name прямо внутри объекта User
+            Field nameField = user.getClass().getDeclaredField("name");
+            long nameOffset = unsafe.objectFieldOffset(nameField);
+            unsafe.putObject(user, nameOffset, newName);
+
+            // Меняем поле uuid прямо внутри объекта User
+            Field uuidField = user.getClass().getDeclaredField("uuid");
+            long uuidOffset = unsafe.objectFieldOffset(uuidField);
+            unsafe.putObject(user, uuidOffset, newUuid);
+
+            // Проверяем, применились ли изменения
             if (mc.getUser().getName().equals(newName)) {
-                statusMessage = "УСПЕХ! Ник изменен на " + newName + ". Зайди в мир.";
+                statusMessage = "УСПЕХ! Ник изменен на " + newName;
                 statusColor = 0x55FF55; // Зеленый
             } else {
-                statusMessage = "Ошибка: Память обновлена, но Майнкрафт не видит изменений.";
+                statusMessage = "Ошибка: Изменения не применились.";
                 statusColor = 0xFF5555;
             }
 
         } catch (Throwable e) {
             String errorName = e.getClass().getSimpleName();
-            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
-            statusMessage = "ОШИБКА: " + errorName + " (" + errorMsg + ")";
+            statusMessage = "ОШИБКА: " + errorName;
             statusColor = 0xFF5555;
             e.printStackTrace();
         }
