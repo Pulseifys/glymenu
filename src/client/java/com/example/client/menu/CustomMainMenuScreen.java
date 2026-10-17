@@ -42,7 +42,8 @@ public class CustomMainMenuScreen extends Screen {
         y += BTN_H + GAP;
         addButton(x, y, "Аккаунты", () -> this.minecraft.setScreen(new AccountsScreen(this)));
         y += BTN_H + GAP;
-        addButton(x, y, "Настройки", () -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options, null)));
+        // ВОТ ЗДЕСЬ УБРАН NULL
+        addButton(x, y, "Настройки", () -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options)));
         y += BTN_H + GAP;
         addButton(x, y, "Выход", () -> this.minecraft.stop());
     }
