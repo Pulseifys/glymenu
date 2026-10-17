@@ -1,104 +1,102 @@
 package com.example.client.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.User;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
 
 public class AccountsScreen extends Screen {
-
     private final Screen parent;
-    private EditBox nameBox;
-    private String status = "";
+    private EditBox nameField;
+    private String statusMessage = "Введите ник и нажмите 'Сменить'";
+    private int statusColor = 0xAAAAAA;
 
     public AccountsScreen(Screen parent) {
-        super(Component.literal("Аккаунты"));
+        super(Component.literal("Accounts"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        int cx = this.width / 2;
-        int y = this.height / 2 - 40;
-        this.nameBox = new EditBox(this.font, cx - 100, y, 200, 20, Component.literal("Ник"));
-        this.nameBox.setValue(this.minecraft.getUser().getName());
-        this.nameBox.setMaxLength(16);
-        addRenderableWidget(this.nameBox);
+        // Текстовое поле для ввода ника
+        this.nameField = new EditBox(this.font, this.width / 2 - 100, this.height / 2 - 20, 200, 20, Component.literal("Nickname"));
+        this.nameField.setValue(this.minecraft.getUser().getName());
+        this.addRenderableWidget(this.nameField);
 
-        // simple clickable "buttons" handled manually
+        // Кнопка смены ника
+        this.addRenderableWidget(Button.builder(Component.literal("Сменить"), (btn) -> {
+            changeNickname(this.nameField.getValue().trim());
+        }).bounds(this.width / 2 - 100, this.height / 2 + 10, 200, 20).build());
+
+        // Кнопка назад
+        this.addRenderableWidget(Button.builder(Component.literal("Назад"), (btn) -> {
+            this.minecraft.setScreen(this.parent);
+        }).bounds(this.width / 2 - 100, this.height / 2 + 40, 200, 20).build());
+    }
+
+    private void changeNickname(String newName) {
+        if (newName.isEmpty() || newName.length() > 16) {
+            statusMessage = "Ник должен быть от 1 до 16 символов!";
+            statusColor = 0xFF5555; // Красный
+            return;
+        }
+
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            // Генерируем оффлайн UUID на основе нового ника
+            UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(StandardCharsets.UTF_8));
+
+            // Пытаемся создать нового пользователя через рефлексию (нужно для 1.21.4)
+            Class<?> userClass = Class.forName("net.minecraft.client.User");
+            Constructor<?> constructor = null;
+            
+            // Ищем подходящий конструктор (String, UUID, String, Optional, Optional)
+            for (Constructor<?> c : userClass.getConstructors()) {
+                if (c.getParameterCount() == 5) {
+                    constructor = c;
+                    break;
+                }
+            }
+
+            Object newUser = null;
+            if (constructor != null) {
+                // Создаем нового пользователя с "нулевым" токеном (подходит для оффлайна)
+                newUser = constructor.newInstance(newName, uuid, "0", Optional.empty(), Optional.empty());
+            }
+
+            // Подменяем пользователя в главном классе Minecraft
+            Field userField = Minecraft.class.getDeclaredField("user");
+            userField.setAccessible(true);
+
+            if (newUser != null) {
+                userField.set(mc, newUser);
+                statusMessage = "Ник изменен на " + newName + "! Перезапусти игру.";
+                statusColor = 0x55FF55; // Зеленый
+            } else {
+                statusMessage = "Ошибка: конструктор не найден (нужен другой метод).";
+                statusColor = 0xFF5555;
+            }
+
+        } catch (Exception e) {
+            statusMessage = "Ошибка: " + e.getClass().getSimpleName();
+            statusColor = 0xFF5555;
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
-        g.fill(0, 0, this.width, this.height, 0xFF0A0A10);
-
-        String nick = this.minecraft.getUser().getName();
-        g.drawCenteredString(this.font, "Текущий ник: " + nick, this.width / 2, this.height / 2 - 70, 0xFFFFFFFF);
-        g.drawCenteredString(this.font, "Введи новый ник и нажми «Сменить ник»", this.width / 2, this.height / 2 - 56, 0xFFA678FF);
-
+        this.renderBackground(g, mouseX, mouseY, delta);
+        g.drawCenteredString(this.font, "Смена оффлайн-аккаунта", this.width / 2, this.height / 2 - 50, 0xFFFFFF);
+        g.drawCenteredString(this.font, statusMessage, this.width / 2, this.height / 2 + 70, statusColor);
         super.render(g, mouseX, mouseY, delta);
-
-        drawBtn(g, mouseX, mouseY, this.width / 2 - 100, this.height / 2 - 10, 200, 20, "Сменить ник");
-        drawBtn(g, mouseX, mouseY, this.width / 2 - 100, this.height / 2 + 16, 200, 20, "Назад");
-
-        if (!status.isEmpty()) {
-            g.drawCenteredString(this.font, status, this.width / 2, this.height / 2 + 48, 0xFF7CFC00);
-        }
-    }
-
-    private void drawBtn(GuiGraphics g, int mouseX, int mouseY, int x, int y, int w, int h, String text) {
-        boolean hovered = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-        int fill = hovered ? 0xC0803FD4 : 0x996A36B0;
-        CustomMainMenuScreenAccess.rounded(g, x, y, w, h, 6, fill);
-        g.drawCenteredString(this.font, text, x + w / 2, y + (h - 8) / 2, 0xFFFFFFFF);
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) {
-            int by1 = this.height / 2 - 10;
-            int by2 = this.height / 2 + 16;
-            int bx = this.width / 2 - 100;
-            if (mouseX >= bx && mouseX <= bx + 200 && mouseY >= by1 && mouseY <= by1 + 20) {
-                changeNick();
-                return true;
-            }
-            if (mouseX >= bx && mouseX <= bx + 200 && mouseY >= by2 && mouseY <= by2 + 20) {
-                this.minecraft.setScreen(this.parent);
-                return true;
-            }
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private void changeNick() {
-        String newName = this.nameBox.getValue().trim();
-        if (newName.isEmpty()) {
-            status = "Введи ник!";
-            return;
-        }
-        try {
-            User user = this.minecraft.getUser();
-            Field nameField = User.class.getDeclaredField("name");
-            nameField.setAccessible(true);
-            nameField.set(user, newName);
-            UUID offlineUuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            Field uuidField = User.class.getDeclaredField("uuid");
-            uuidField.setAccessible(true);
-            uuidField.set(user, offlineUuid);
-            status = "Ник изменён на " + newName;
-        } catch (Throwable t) {
-            status = "Ошибка: " + t.getMessage();
-        }
-    }
-
-    @Override
-    public boolean isPauseScreen() {
-        return false;
     }
 }
