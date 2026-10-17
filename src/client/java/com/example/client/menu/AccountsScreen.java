@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
+import sun.misc.Unsafe;
 
 public class AccountsScreen extends Screen {
     private final Screen parent;
@@ -50,10 +51,7 @@ public class AccountsScreen extends Screen {
             Minecraft mc = Minecraft.getInstance();
             UUID uuid = UUID.nameUUIDFromBytes(("OfflinePlayer:" + newName).getBytes(StandardCharsets.UTF_8));
 
-            // Пытаемся найти класс User (в 1.21.4 он может быть немного другим)
             Class<?> userClass = Class.forName("net.minecraft.client.User");
-            
-            // Ищем конструктор с 5 параметрами
             Constructor<?> constructor = null;
             for (Constructor<?> c : userClass.getConstructors()) {
                 if (c.getParameterCount() == 5) {
@@ -70,16 +68,27 @@ public class AccountsScreen extends Screen {
 
             Object newUser = constructor.newInstance(newName, uuid, "0", Optional.empty(), Optional.empty());
 
-            // Пытаемся подменить поле user в классе Minecraft
-            Field userField = Minecraft.class.getDeclaredField("user");
-            userField.setAccessible(true);
-            userField.set(mc, newUser);
+            // ХАК: Используем Unsafe, чтобы обойти защиту Java 21 на изменение final полей
+            Field theUnsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+            theUnsafeField.setAccessible(true);
+            Unsafe unsafe = (Unsafe) theUnsafeField.get(null);
 
-            statusMessage = "Успех! Ник изменен на " + newName + ". Перезапусти игру.";
-            statusColor = 0x55FF55; // Зеленый
+            Field userField = Minecraft.class.getDeclaredField("user");
+            long offset = unsafe.objectFieldOffset(userField);
+            
+            // Подменяем пользователя напрямую в памяти
+            unsafe.putObject(mc, offset, newUser);
+
+            // Проверяем, сменился ли ник в самом Minecraft
+            if (mc.getUser().getName().equals(newName)) {
+                statusMessage = "УСПЕХ! Ник изменен на " + newName + ". Зайди в мир.";
+                statusColor = 0x55FF55; // Зеленый
+            } else {
+                statusMessage = "Ошибка: Память обновлена, но Майнкрафт не видит изменений.";
+                statusColor = 0xFF5555;
+            }
 
         } catch (Throwable e) {
-            // Если произошла ошибка, показываем её на экране
             String errorName = e.getClass().getSimpleName();
             String errorMsg = e.getMessage() != null ? e.getMessage() : "";
             statusMessage = "ОШИБКА: " + errorName + " (" + errorMsg + ")";
